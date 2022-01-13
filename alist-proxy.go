@@ -169,6 +169,7 @@ func apiHandle(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, 500, err.Error())
 		return
 	}
+	w.WriteHeader(res.StatusCode)
 	for h, v := range res.Header {
 		w.Header()[h] = v
 	}
