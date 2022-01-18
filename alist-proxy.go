@@ -101,8 +101,15 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/admin/link", host), bytes.NewBuffer(dataByte))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", token)
-	res, _ := HttpClient.Do(req)
-	dataByte, err := ioutil.ReadAll(res.Body)
+	res, err := HttpClient.Do(req)
+	if err != nil {
+		errorResponse(w, 500, err.Error())
+		return
+	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
+	dataByte, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
@@ -137,15 +144,18 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 			req.Header.Set(header.Name, header.Value)
 		}
 	}
-	res, err = HttpClient.Do(req)
+	res2, err := HttpClient.Do(req)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
 	}
-	for h, v := range res.Header {
+	defer func() {
+		_ = res2.Body.Close()
+	}()
+	for h, v := range res2.Header {
 		w.Header()[h] = v
 	}
-	_, err = io.Copy(w, res.Body)
+	_, err = io.Copy(w, res2.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
@@ -169,6 +179,9 @@ func apiHandle(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, 500, err.Error())
 		return
 	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	w.WriteHeader(res.StatusCode)
 	for h, v := range res.Header {
 		w.Header()[h] = v
