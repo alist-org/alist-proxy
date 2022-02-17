@@ -127,13 +127,13 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(resp.Data.Url, "http") {
 		resp.Data.Url = "http:" + resp.Data.Url
 	}
-	fmt.Println(resp.Data.Url)
+	fmt.Println("proxy:", resp.Data.Url)
 	u, err := url.Parse(resp.Data.Url)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
 	}
-	req, _ = http.NewRequest("GET", resp.Data.Url, nil)
+	req, _ = http.NewRequest(r.Method, resp.Data.Url, nil)
 	for h, val := range r.Header {
 		req.Header[h] = val
 	}
@@ -153,8 +153,14 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 		_ = res2.Body.Close()
 	}()
 	for h, v := range res2.Header {
+		if strings.ToLower(h) == strings.ToLower("Access-Control-Allow-Origin") {
+			continue
+		}
 		w.Header()[h] = v
 	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Add("Access-Control-Allow-Headers", "range")
 	_, err = io.Copy(w, res2.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
