@@ -43,8 +43,8 @@ func init() {
 	flag.IntVar(&port, "port", 5243, "the proxy port.")
 	flag.BoolVar(&https, "https", false, "use https protocol.")
 	flag.BoolVar(&help, "help", false, "show help")
-	flag.StringVar(&certFile, "cert", "", "cert file")
-	flag.StringVar(&keyFile, "key", "", "key file")
+	flag.StringVar(&certFile, "cert", "server.crt", "cert file")
+	flag.StringVar(&keyFile, "key", "server.key", "key file")
 	flag.StringVar(&host, "host", "", "alist host")
 	flag.StringVar(&token, "token", "", "alist token")
 	flag.Parse()
@@ -128,23 +128,21 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 		resp.Data.Url = "http:" + resp.Data.Url
 	}
 	fmt.Println("proxy:", resp.Data.Url)
-	u, err := url.Parse(resp.Data.Url)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
 	}
-	req, _ = http.NewRequest(r.Method, resp.Data.Url, nil)
+	req2, _ := http.NewRequest(r.Method, resp.Data.Url, nil)
 	for h, val := range r.Header {
-		req.Header[h] = val
+		req2.Header[h] = val
 	}
-	req.Host = u.Host
 	headers := resp.Data.Headers
 	if headers != nil {
 		for _, header := range headers {
-			req.Header.Set(header.Name, header.Value)
+			req2.Header.Set(header.Name, header.Value)
 		}
 	}
-	res2, err := HttpClient.Do(req)
+	res2, err := HttpClient.Do(req2)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
@@ -152,6 +150,7 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = res2.Body.Close()
 	}()
+	w.WriteHeader(res.StatusCode)
 	for h, v := range res2.Header {
 		if strings.ToLower(h) == strings.ToLower("Access-Control-Allow-Origin") {
 			continue
