@@ -150,7 +150,6 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = res2.Body.Close()
 	}()
-	w.WriteHeader(res.StatusCode)
 	for h, v := range res2.Header {
 		if strings.ToLower(h) == strings.ToLower("Access-Control-Allow-Origin") {
 			continue
@@ -160,6 +159,7 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Add("Access-Control-Allow-Headers", "range")
+	w.WriteHeader(res.StatusCode)
 	_, err = io.Copy(w, res2.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
@@ -187,10 +187,10 @@ func apiHandle(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = res.Body.Close()
 	}()
-	w.WriteHeader(res.StatusCode)
 	for h, v := range res.Header {
 		w.Header()[h] = v
 	}
+	w.WriteHeader(res.StatusCode)
 	_, err = io.Copy(w, res.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
