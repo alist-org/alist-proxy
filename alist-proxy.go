@@ -159,7 +159,7 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Add("Access-Control-Allow-Headers", "range")
-	w.WriteHeader(res.StatusCode)
+	w.WriteHeader(res2.StatusCode)
 	_, err = io.Copy(w, res2.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
