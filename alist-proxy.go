@@ -2,30 +2,23 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"path"
 	"strings"
+
+	"github.com/alist-org/alist/v3/pkg/sign"
 )
 
-type Header struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
 type Link struct {
-	Url     string   `json:"url"`
-	Headers []Header `json:"headers"`
+	Url    string      `json:"url"`
+	Header http.Header `json:"header"`
 }
 
-type Resp struct {
+type LinkResp struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    Link   `json:"data"`
@@ -36,7 +29,8 @@ var (
 	https             bool
 	help              bool
 	certFile, keyFile string
-	host, token       string
+	address, token    string
+	s                 sign.Sign
 )
 
 func init() {
@@ -45,32 +39,13 @@ func init() {
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.StringVar(&certFile, "cert", "server.crt", "cert file")
 	flag.StringVar(&keyFile, "key", "server.key", "key file")
-	flag.StringVar(&host, "host", "", "alist host")
+	flag.StringVar(&address, "address", "", "alist address")
 	flag.StringVar(&token, "token", "", "alist token")
 	flag.Parse()
-}
-
-func Md5(data []byte) string {
-	h := md5.New()
-	h.Write(data)
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func Sign(fileName string) string {
-	md516 := Md5([]byte(fmt.Sprintf("alist-%s-%s", token, fileName)))[8:24]
-	return md516
+	s = sign.NewHMACSign([]byte(token))
 }
 
 var HttpClient = &http.Client{}
-
-func proxyHandle(w http.ResponseWriter, r *http.Request) {
-	sign := r.URL.Query().Get("sign")
-	if len(sign) == 16 {
-		downHandle(w, r)
-	} else {
-		apiHandle(w, r)
-	}
-}
 
 type Json map[string]interface{}
 
@@ -90,15 +65,16 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	sign := r.URL.Query().Get("sign")
 	filePath := r.URL.Path
 	fileName := path.Base(filePath)
-	if sign != Sign(fileName) {
-		errorResponse(w, 401, "sign mismatch")
+	err := s.Verify(fileName, sign)
+	if err != nil {
+		errorResponse(w, 401, err.Error())
 		return
 	}
 	data := Json{
 		"path": filePath,
 	}
 	dataByte, _ := json.Marshal(data)
-	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/admin/link", host), bytes.NewBuffer(dataByte))
+	req, _ := http.NewRequest("POST", fmt.Sprintf("%s/api/fs/link", address), bytes.NewBuffer(dataByte))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", token)
 	res, err := HttpClient.Do(req)
@@ -109,12 +85,12 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = res.Body.Close()
 	}()
-	dataByte, err = ioutil.ReadAll(res.Body)
+	dataByte, err = io.ReadAll(res.Body)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
 		return
 	}
-	var resp Resp
+	var resp LinkResp
 	err = json.Unmarshal(dataByte, &resp)
 	if err != nil {
 		errorResponse(w, 500, err.Error())
@@ -136,11 +112,8 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	for h, val := range r.Header {
 		req2.Header[h] = val
 	}
-	headers := resp.Data.Headers
-	if headers != nil {
-		for _, header := range headers {
-			req2.Header.Set(header.Name, header.Value)
-		}
+	for h, val := range resp.Data.Header {
+		req2.Header[h] = val
 	}
 	res2, err := HttpClient.Do(req2)
 	if err != nil {
@@ -167,37 +140,6 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func apiHandle(w http.ResponseWriter, r *http.Request) {
-	targetUrl := r.URL.Path[1:] + "?" + r.URL.Query().Encode()
-	u, err := url.Parse(targetUrl)
-	if err != nil {
-		errorResponse(w, 500, err.Error())
-		return
-	}
-	req, _ := http.NewRequest(r.Method, targetUrl, r.Body)
-	for h, val := range r.Header {
-		req.Header[h] = val
-	}
-	req.Host = u.Host
-	res, err := HttpClient.Do(req)
-	if err != nil {
-		errorResponse(w, 500, err.Error())
-		return
-	}
-	defer func() {
-		_ = res.Body.Close()
-	}()
-	for h, v := range res.Header {
-		w.Header()[h] = v
-	}
-	w.WriteHeader(res.StatusCode)
-	_, err = io.Copy(w, res.Body)
-	if err != nil {
-		errorResponse(w, 500, err.Error())
-		return
-	}
-}
-
 func main() {
 	if help {
 		flag.Usage()
@@ -207,7 +149,7 @@ func main() {
 	fmt.Printf("listen and serve: %s\n", addr)
 	s := http.Server{
 		Addr:    addr,
-		Handler: http.HandlerFunc(proxyHandle),
+		Handler: http.HandlerFunc(downHandle),
 	}
 	if !https {
 		if err := s.ListenAndServe(); err != nil {
