@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/alist-org/alist/v3/pkg/sign"
@@ -64,8 +63,7 @@ func errorResponse(w http.ResponseWriter, code int, msg string) {
 func downHandle(w http.ResponseWriter, r *http.Request) {
 	sign := r.URL.Query().Get("sign")
 	filePath := r.URL.Path
-	fileName := path.Base(filePath)
-	err := s.Verify(fileName, sign)
+	err := s.Verify(filePath, sign)
 	if err != nil {
 		errorResponse(w, 401, err.Error())
 		return
@@ -124,7 +122,7 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 		_ = res2.Body.Close()
 	}()
 	for h, v := range res2.Header {
-		if strings.ToLower(h) == strings.ToLower("Access-Control-Allow-Origin") {
+		if strings.EqualFold(h, "Access-Control-Allow-Origin") {
 			continue
 		}
 		w.Header()[h] = v
