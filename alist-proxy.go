@@ -121,10 +121,9 @@ func downHandle(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = res2.Body.Close()
 	}()
+	res2.Header.Del("Access-Control-Allow-Origin")
+	res2.Header.Del("set-cookie")
 	for h, v := range res2.Header {
-		if strings.EqualFold(h, "Access-Control-Allow-Origin") {
-			continue
-		}
 		w.Header()[h] = v
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
