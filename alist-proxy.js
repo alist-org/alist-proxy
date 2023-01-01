@@ -1,6 +1,6 @@
 // src/const.ts
-var ADDRESS = "YOUR_ADDRESS";
-var TOKEN = "YOUR_TOKEN";
+var ADDRESS = "https://192.168.1.15:5244";
+var TOKEN = "alist-b3161fbb-d61b-4b8b-b5b9-86b6a675d1eaep2zxAH1EcQis17v6vcWrafWqT33m2QWpqjawB2DW3y8zWW90doWdc0O1iBUS88F";
 
 // src/verify.ts
 var verify = async (data, _sign) => {
