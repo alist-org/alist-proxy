@@ -76,7 +76,7 @@ async function handleDownload(request) {
   if (res.code !== 200) {
     return new Response(JSON.stringify(res));
   }
-  request = new Request(res.data.url, request);
+  request = new Request(res.data.url, { ...request, redirect: "follow" });
   if (res.data.header) {
     for (const k in res.data.header) {
       for (const v of res.data.header[k]) {
