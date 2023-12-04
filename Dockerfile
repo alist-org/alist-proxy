@@ -3,7 +3,7 @@ LABEL stage=go-builder
 WORKDIR /app/
 COPY ./ ./
 RUN apk add --no-cache bash curl gcc git go musl-dev; \
-    go build . -o /app/bin/alist-proxy
+    go build -o /app/bin/alist-proxy -ldflags="-w -s" .
 
 FROM alpine:edge
 LABEL MAINTAINER="i@nn.ci"
