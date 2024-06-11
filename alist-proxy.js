@@ -1,6 +1,7 @@
 // src/const.ts
 var ADDRESS = "YOUR_ADDRESS";
 var TOKEN = "YOUR_TOKEN";
+var WORKER_ADDRESS = "YOUR_WORKER_ADDRESS";
 
 // src/verify.ts
 var verify = async (data, _sign) => {
@@ -21,6 +22,7 @@ var verify = async (data, _sign) => {
   }
   return "";
 };
+
 var hmacSha256Sign = async (data, expire) => {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -77,7 +79,6 @@ async function handleDownload(request) {
     return new Response(JSON.stringify(res));
   }
   request = new Request(res.data.url, request);
-  request = new Request(request, { redirect: "follow" });
   if (res.data.header) {
     for (const k in res.data.header) {
       for (const v of res.data.header[k]) {
@@ -86,6 +87,17 @@ async function handleDownload(request) {
     }
   }
   let response = await fetch(request);
+  while (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("Location");
+    if (location.startsWith(`${WORKER_ADDRESS}/`)) {
+      request = new Request(location, request);
+      return await handleRequest(request);
+    } else if (!location) {
+      break;
+    }
+    request = new Request(location, request);
+    response = await fetch(request);
+  }
   response = new Response(response.body, response);
   response.headers.delete("set-cookie");
   response.headers.set("Access-Control-Allow-Origin", origin);
@@ -118,16 +130,17 @@ function handleOptions(request) {
   }
 }
 
-// src/index.ts
-var src_default = {
-  async fetch(request, env, ctx) {
-    if (request.method === "OPTIONS") {
-      return handleOptions(request);
-    }
-    return handleDownload(request);
+async function handleRequest(request) {
+  if (request.method === "OPTIONS") {
+    return handleOptions(request);
   }
-};
-export {
-  src_default as default
+  return await handleDownload(request);
+}
+
+// src/index.ts
+export default {
+  async fetch(request, env, ctx) {
+    return await handleRequest(request);
+  }
 };
 //# sourceMappingURL=index.js.map
